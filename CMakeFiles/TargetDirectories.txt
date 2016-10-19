@@ -1,0 +1,3 @@
+/home/rogier/konker/CMakeFiles/edit_cache.dir
+/home/rogier/konker/CMakeFiles/rebuild_cache.dir
+/home/rogier/konker/CMakeFiles/konker.dir
