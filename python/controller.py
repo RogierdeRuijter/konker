@@ -18,7 +18,7 @@ teamLijst heeft heeft de volgende structuur:
 	
 	teamLijst{team:'teamnaam',compleet:False}
 	of
-	teamLijst{team:'teamnaam',compleet:True,beschikbaarheid:[x1,..,x10]}
+	teamLijst{team:'teamnaam',compleet:True,beschikbaarheid:[x1,..,x(9 of 10)}
 	
 	Als compleet de waarde False heeft dat is er iets fout gegaan in het vergaren van de informatie
 	over dat team. Door de Controller class heen zijn er meerdere momenten waarop de waarde naar False kan gaan.
@@ -28,12 +28,17 @@ LedenLijst heeft deze structuur,
 	ledenLijst[lid:'lidNaam':team: 'teamnaam']
 
 	De ledenLijst dic wordt gevult met de informatie uit de file 'HorecaLeden'
-'''
 
-#TODO: 
-#	- Scoren per lid
-#	- Een rooster maken
-#	- Rekening houden dat er info over op welk veld er wordt gespeeld bij kan zitten 
+
+TODO: 
+	- Scoren per lid
+	- Een rooster maken
+	- Rekening houden dat er info over op welk veld er wordt gespeeld bij kan zitten 
+	- Verifiy in en parse
+	- Informatie opslaan waar compleet naar False wordt gezet. Kan via een lijst, dat elke False assignment plek een nummer heeft, 
+		zodat je precies kan printen aan het einde van de code kan printen waar het in de code is mis gegaan. 
+		zo kan de code ook cleaner worden omdat alle error print statements naar 1 functie verdwijnen 
+'''
 class Controller:
 	def __init__(self):
 		#global variables read from config file
@@ -104,50 +109,103 @@ class Controller:
 		self.ledenLijst[naam] = team
 		return {'naam':naam,'team':team}
 	
-	def listMetTeamInfo(self,team):
-		teamCharNum = self.cleantext.find(team)
-		
-		blok = self.cleantext[teamCharNum:teamCharNum+(self.blokSize)]
-
+	def parseInputData(self,blok):
+		inputList = []
 		if(blok == ''):
-			print "De team informatie voor " + team + " is niet gevonden"
-			self.teamLijst[team]['compleet'] = False
-			return
-		else:
-			if self.debug:
-				print 'begin listMetTeamInfo'
-				print blok
-			#opdelen in inspectBlok() en parseBlok()
+			return []
+		if self.debug:
+			print blok
 
-			blok = blok.replace('\t','')
-			blok = blok.replace('-', '')
-			blok = blok.replace(' ',',')
-			
-			new = ''
-			#dit wordt raar gedaan omdat de data die in 'blok' zit kanker vaag is
-			for char in blok:
-				if char.isdigit() or char.isalpha() or char == ',' or char == ':':
-					new += char
-				#to remove double qoutes if there are mutliple newlines next to eachother
-				if char == '\n' and new[len(new)-1:len(new)] != ',': 
-					new += ','
-			
-			tempList = []
-			entry = ''
-			#zet alle info in een lijst
-			for x in new:
-				if x != ',':
-					entry += x
-				else:
-					tempList.append(entry)
-					entry = ''
-			
-			if '' in tempList:
-				tempList.remove('')
-			if self.debug:
-				print '\t' + str(tempList)
-				print 'einde listMetTeamInfo'
-			return tempList
+		blok = blok.replace(' ',',')
+		new = ''
+		#dit wordt raar gedaan omdat de data die in 'blok' zit kanker vaag is
+		for char in blok:
+			if char.isdigit() or char.isalpha() or char == ',' or char == ':':
+				new += char
+			#to remove double qoutes if there are mutliple newlines next to eachother
+			if char == '\n': 
+				new += ','
+
+			if new[-2:] == ',,':
+				new = new[:-1]
+		
+		inputString = new
+		entry = ''
+		for x in inputString:
+			if x != ',':
+				entry += x
+			else:
+				inputList.append(entry)
+				entry = ''
+		return inputList
+
+	def verifyInputData(self,parsedData,infoHorecaLid):
+		teamInfo = {}
+		if parsedData == []:
+			print "De team informatie voor " + infoHorecaLid['team'] + " is niet gevonden"
+			self.teamLijst[infoHorecaLid['team']]['compleet'] = False
+			return infoHorecaLid
+
+		if not parsedData[0] == infoHorecaLid['team'][:-3]:
+			print 'parsedData and horecaLid komen niet overeen'
+			print parsedData[0] + infoHorecaLid['team'][:-3]
+			self.teamLijst[infoHorecaLid[infoHorecaLid['team']]['compleet']] = False
+			return infoHorecaLid
+
+		if not parsedData[1] == infoHorecaLid['team'][-2:]:
+			print 'parsedData and horecaLid komen niet overeen'
+			print parsedData[1] + infoHorecaLid['team'][-2:]
+			self.teamLijst[infoHorecaLid[infoHorecaLid['team']]['compleet']] = False
+			return infoHorecaLid
+
+		teamInfo['team'] = infoHorecaLid['team']
+
+		parsedData.remove(infoHorecaLid['team'][:-3])
+		parsedData.remove(infoHorecaLid['team'][-2:])
+
+		tegenstander = ""
+		tempTeamInfo = parsedData[:]
+		for entry in parsedData: #team nummer van tegenstander wordt weggegooid
+			if entry.isalpha():
+				tegenstander += entry + ' '
+				tempTeamInfo.remove(entry)
+			else:
+				tempTeamInfo.remove(entry)
+				break
+		parsedData = tempTeamInfo
+		teamInfo['tegenstander'] = tegenstander[:-1]
+
+		if not parsedData[0].find(':') == 2 or not parsedData[0][:2].isdigit() or not parsedData[0][-2:].isdigit():
+			print "er is iets mis met de ingelezen tijd"
+			if parsedData[0] == 'nnb':
+				print 'de tijd voor ' + teamInfo['team'] + ' staat nog niet op de gchc site. Probeer het later nog eens of vul het zelf in.'
+			else:
+				print parsedData[0] + teamInfo['team']
+			self.teamLijst[infoHorecaLid['team']]['compleet'] = False
+			parsedData.remove(parsedData[0]) 
+		else:
+			teamInfo['speeltijd'] = parsedData[0]
+			parsedData.remove(parsedData[0]) 
+
+		if parsedData[0][:1].isalpha() and parsedData[0][1:].isdigit():
+			parsedData.remove(parsedData[0])
+
+		if parsedData[0].lower() != 'thuis' and parsedData[0].lower() != 'uit':
+			print "Er klopt iets niet met de plek waar er gespeeld wordt"
+			print parsedData[0]
+			self.teamLijst[infoHorecaLid['team']]['compleet'] = False
+			parsedData.remove(parsedData[0])
+		else:
+			teamInfo['speelplek'] = parsedData[0].lower()
+			parsedData.remove(parsedData[0])
+
+		if not parsedData == []:
+			print 'de parsedData lijst is niet leeg'
+			self.teamLijst[infoHorecaLid['team']]['compleet'] = False
+			print parsedData
+			print teamInfo
+
+		return teamInfo
 
 	#transformeer tijd naar base 100
 	def speelTijdTeam(self,speeltijdTeam):
@@ -155,79 +213,31 @@ class Controller:
 			print 'begin speelTijdTeam'
 			print "\tspeelTijdTeam: " + speeltijdTeam
 
-		uur = int(speeltijdTeam[:2]) * 100
+		uur = int(speeltijdTeam[:2]) * 100 #e.g. 14 wordt 1400
 
 		minuten = int(speeltijdTeam[3:])
 
 		if minuten != 0:
-			minuten = (minuten /60.0)*100
+			minuten = (minuten /60.0)*100 #door het delen wordt het een float
 		
 		if self.debug:
 			print '\tuur: ' + str(uur)
 			print '\tminuten: '+ str(minuten)
 			print 'einde speelTijdTeam'
 
-		return int(round(uur) + round(minuten))
+		return int(round(uur) + round(minuten)) #wel weer doorrekenen met ints
 
 	def getInfoTeamHorecaLid(self,infoHorecaLid):
-		listInfoTeam = self.listMetTeamInfo(infoHorecaLid['team'])
-		teamInfo = {}
+		teamCharNum = self.cleantext.find(infoHorecaLid['team'])
+		
+		parsedData = self.parseInputData(self.cleantext[teamCharNum:teamCharNum+(self.blokSize)])
+
+		verifiedData = self.verifyInputData(parsedData,infoHorecaLid)
+
 		if self.teamLijst[infoHorecaLid['team']]['compleet'] == False:
 			return infoHorecaLid
-		if not listInfoTeam[0] == infoHorecaLid['team'][:-3]:
-			print 'listInfoTeam and horecaLid komen niet overeen'
-			print listInfoTeam[0] + infoHorecaLid['team'][:-3]
-			exit()
-		if not listInfoTeam[1] == infoHorecaLid['team'][-2:]:
-			print 'listInfoTeam and horecaLid komen niet overeen'
-			print listInfoTeam[1] + infoHorecaLid['team'][-2:]
-			exit()
 
-		teamInfo['team'] = infoHorecaLid['team']
-
-		listInfoTeam.remove(infoHorecaLid['team'][:-3])
-		listInfoTeam.remove(infoHorecaLid['team'][-2:])
-
-		tegenstander = ""
-		tempTeamInfo = listInfoTeam[:]
-		for entry in listInfoTeam: #team nummer van tegenstander wordt weggegooid
-			if entry.isalpha():
-				tegenstander += entry + ' '
-				tempTeamInfo.remove(entry)
-			else:
-				tempTeamInfo.remove(entry)
-				break
-		listInfoTeam = tempTeamInfo
-		teamInfo['tegenstander'] = tegenstander[:-1]
-		
-		if not listInfoTeam[0].find(':') == 2 or not listInfoTeam[0][:2].isdigit() or not listInfoTeam[0][-2:].isdigit():
-			print "er is iets mis met de ingelezen tijd"
-			if listInfoTeam[0] == 'nnb':
-				print 'de tijd voor ' + teamInfo['team'] + ' staat nog niet op de gchc site. Probeer het later nog eens of vul het zelf in.'
-			else:
-				print listInfoTeam[0] + teamInfo['team']
-			self.teamLijst[infoHorecaLid['team']]['compleet'] = False
-			listInfoTeam.remove(listInfoTeam[0]) 
-		else:
-			teamInfo['speeltijd'] = listInfoTeam[0]
-			listInfoTeam.remove(listInfoTeam[0]) 
-		
-		if listInfoTeam[0].lower() != 'thuis' and listInfoTeam[0].lower() != 'uit':
-			print "Er klopt iets niet met de plek waar er gespeeld wordt"
-			print listInfoTeam[0]
-			self.teamLijst[infoHorecaLid['team']]['compleet'] = False
-			listInfoTeam.remove(listInfoTeam[0])
-		else:
-			teamInfo['speelplek'] = listInfoTeam[0].lower()
-			listInfoTeam.remove(listInfoTeam[0])
-
-		if not listInfoTeam == []:
-			print 'de listInfoTeam lijst is niet leeg'
-			self.teamLijst[infoHorecaLid['team']]['compleet'] = False
-			print listInfoTeam
-			print teamInfo
-
-		return teamInfo
+		return verifiedData
 
 	def findnth(self,haystack, needle, n):
 	    parts= haystack.split(needle, n+1)
@@ -254,7 +264,7 @@ class Controller:
 			place['status'] = 'INLIJST'
 		else:
 			oldtegenstander = tegenstander
-			time.sleep(10)
+			time.sleep(5)
 			places = googlemaps.Client(keyplaces)
 			place = places.places(tegenstander)
 			if place['status'] == 'ZERO_RESULTS':
@@ -265,8 +275,6 @@ class Controller:
 				tegenstander_adress = place['results'][0]['formatted_address']
 				f.write(oldtegenstander + ',,'  + tegenstander + ',,' + tegenstander_adress + '\n')
 		f.close()	
-
-		print tegenstander
 		f = open("reistijdClubs","r+")
 		reistijdClubs = f.read()
 		if tegenstander in reistijdClubs:
@@ -282,8 +290,16 @@ class Controller:
 			gmaps = googlemaps.Client(key)
 			directions_result = {}
 			if place['status'] == 'OK' or place['status'] == 'INLIJST':
-				directions_result = gmaps.directions(self.thuisAdress,tegenstander_adress,mode="driving",region='nl') 
-
+				while tegenstander_adress != '':
+					try:
+						directions_result = gmaps.directions(self.thuisAdress,tegenstander_adress,mode="driving",region='nl') 
+					except Exception:
+						time.sleep(2)
+						numNieuwWoord = tegenstander_adress.find(' ')
+						tegenstander_adress = tegenstander_adress[numNieuwWoord+1:]
+						print tegenstander_adress
+					else:
+						break
 			if self.debug and directions_result != []:
 				print '\tdirections_result[0][legs][0][duration]: ' + str(directions_result[0]['legs'][0]['duration'])
 				print '\tdirections_result[0][legs][0][duration][text]: ' + str(directions_result[0]['legs'][0]['duration']['text'])
