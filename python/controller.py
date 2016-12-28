@@ -109,56 +109,80 @@ class Controller:
 		self.ledenLijst[naam] = team
 		return {'naam':naam,'team':team}
 	
-	def parseInputData(self,blok):
+	def preProcessInputData(self,blok):
 		inputList = []
 		if(blok == ''):
 			return []
-		if self.debug:
-			print blok
 
 		blok = blok.replace(' ',',')
 		new = ''
 		#dit wordt raar gedaan omdat de data die in 'blok' zit kanker vaag is
+		
 		for char in blok:
 			if char.isdigit() or char.isalpha() or char == ',' or char == ':':
 				new += char
-			#to remove double qoutes if there are mutliple newlines next to eachother
 			if char == '\n': 
 				new += ','
-
+		#to remove double qoutes if there are mutliple newlines next to eachother
 			if new[-2:] == ',,':
 				new = new[:-1]
 		
-		inputString = new
+		inputString = new + ','
 		entry = ''
+		
+		if self.debug:
+			print inputString
+
 		for x in inputString:
 			if x != ',':
 				entry += x
 			else:
 				inputList.append(entry)
 				entry = ''
+		
+		if self.debug:
+			print str(inputList)
+		
 		return inputList
+		#TODO
+	def parseInputData(self,verifiedData):
+		teamInfo = {}
+
+		tegenstander = ""
+		tempTeamInfo = verifiedData[:]
+
+		for entry in parsedData: #team nummer van tegenstander wordt weggegooid
+			if entry.isalpha():
+				tegenstander += entry + ' '
+				tempTeamInfo.remove(entry)
+			else:
+				tempTeamInfo.remove(entry)
+				break
+		verifiedData = tempTeamInfo
+		teamInfo['tegenstander'] = tegenstander[:-1]
+
+		teamInfo['speeltijd'] = parsedData[0]
+		parsedData.remove(parsedData[0]) 
 
 	def verifyInputData(self,parsedData,infoHorecaLid):
-		teamInfo = {}
 		if parsedData == []:
 			print "De team informatie voor " + infoHorecaLid['team'] + " is niet gevonden"
 			self.teamLijst[infoHorecaLid['team']]['compleet'] = False
-			return infoHorecaLid
 
 		if not parsedData[0] == infoHorecaLid['team'][:-3]:
 			print 'parsedData and horecaLid komen niet overeen'
 			print parsedData[0] + infoHorecaLid['team'][:-3]
-			self.teamLijst[infoHorecaLid[infoHorecaLid['team']]['compleet']] = False
-			return infoHorecaLid
+			#self.teamLijst[infoHorecaLid[infoHorecaLid['team']]['compleet']] = False
+			self.teamLijst[infoHorecaLid['team']]['compleet'] = False
 
 		if not parsedData[1] == infoHorecaLid['team'][-2:]:
 			print 'parsedData and horecaLid komen niet overeen'
 			print parsedData[1] + infoHorecaLid['team'][-2:]
-			self.teamLijst[infoHorecaLid[infoHorecaLid['team']]['compleet']] = False
+			#self.teamLijst[infoHorecaLid[infoHorecaLid['team']]['compleet']] = False
+			self.teamLijst[infoHorecaLid['team']]['compleet'] = False
 			return infoHorecaLid
 
-		teamInfo['team'] = infoHorecaLid['team']
+		#teamInfo['team'] = infoHorecaLid['team']
 
 		parsedData.remove(infoHorecaLid['team'][:-3])
 		parsedData.remove(infoHorecaLid['team'][-2:])
@@ -178,9 +202,9 @@ class Controller:
 		if not parsedData[0].find(':') == 2 or not parsedData[0][:2].isdigit() or not parsedData[0][-2:].isdigit():
 			print "er is iets mis met de ingelezen tijd"
 			if parsedData[0] == 'nnb':
-				print 'de tijd voor ' + teamInfo['team'] + ' staat nog niet op de gchc site. Probeer het later nog eens of vul het zelf in.'
+				print 'de tijd voor ' + infoHorecaLid['team'] + ' staat nog niet op de gchc site. Probeer het later nog eens of vul het zelf in.'
 			else:
-				print parsedData[0] + teamInfo['team']
+				print parsedData[0] + infoHorecaLid['team']
 			self.teamLijst[infoHorecaLid['team']]['compleet'] = False
 			parsedData.remove(parsedData[0]) 
 		else:
@@ -205,8 +229,6 @@ class Controller:
 			print parsedData
 			print teamInfo
 
-		return teamInfo
-
 	#transformeer tijd naar base 100
 	def speelTijdTeam(self,speeltijdTeam):
 		if self.debug:
@@ -227,12 +249,36 @@ class Controller:
 
 		return int(round(uur) + round(minuten)) #wel weer doorrekenen met ints
 
+	def findBlokSize(self,teamCharNum):
+		laatsteWoorden = ['Thuis','Uit']
+		blok = ''
+		for i,char in enumerate(self.cleantext[teamCharNum:]):
+			if laatsteWoorden[0] in blok or laatsteWoorden[1] in blok:
+				break
+			blok += char
+		return len(blok)
+
+	def getInputData(self,teamCharNum):
+		bloksize = self.findBlokSize(teamCharNum)
+		blok = self.cleantext[teamCharNum:teamCharNum+bloksize]
+		
+		if self.debug:
+			print blok
+		
+		return blok
+
 	def getInfoTeamHorecaLid(self,infoHorecaLid):
 		teamCharNum = self.cleantext.find(infoHorecaLid['team'])
 		
-		parsedData = self.parseInputData(self.cleantext[teamCharNum:teamCharNum+(self.blokSize)])
+		dataInBlok = self.getInputData(teamCharNum)
 
-		verifiedData = self.verifyInputData(parsedData,infoHorecaLid)
+		preProcessInputData = self.preProcessInputData(dataInBlok)
+		
+		verifiedData = self.verifyInputData(preProcessInputData,infoHorecaLid)
+		exit()
+
+		parsedData = self.parseInputData()
+
 
 		if self.teamLijst[infoHorecaLid['team']]['compleet'] == False:
 			return infoHorecaLid
