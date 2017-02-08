@@ -5,7 +5,7 @@ import tkinter as tk
 
 person = elizabeth.Personal('nl')
 address = elizabeth.Address('nl')
-data = elizabeth.Text('nl')
+data = elizabeth.Text('fr')
 
 class GenDummpyData():
 

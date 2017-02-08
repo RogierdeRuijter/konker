@@ -1,12 +1,10 @@
 #open-webpage.py
-import urllib2
 import config
 import xlwt
-import re
 import sys
 import time
 from key import key,keyplaces
-
+import handelinputdata
 import googlemaps
 from datetime import datetime
 
@@ -33,7 +31,6 @@ LedenLijst heeft deze structuur,
 TODO: 
 	- Scoren per lid
 	- Een rooster maken
-	- Rekening houden dat er info over op welk veld er wordt gespeeld bij kan zitten 
 	- Verifiy in en parse
 	- Informatie opslaan waar compleet naar False wordt gezet. Kan via een lijst, dat elke False assignment plek een nummer heeft, 
 		zodat je precies kan printen aan het einde van de code kan printen waar het in de code is mis gegaan. 
@@ -45,8 +42,6 @@ class Controller:
 		#can this go into a struct?
 		self.debug = config.debug
 		self.outputUser = config.outputUser
-		self.downloadWebPage = config.downloadWebPage
-		self.saveWebPage = config.saveWebPage
 		
 		self.thuisAdress = config.thuisAdress
 
@@ -58,37 +53,15 @@ class Controller:
 		self.shiftTijd = config.shiftTijd
 		self.beginTijdDag = config.beginTijdDag
 		self.shifts = config.shifts
-		self.url = config.url
 		self.horecaLeden = config.horecaLeden
 
 		#empty global variables for later assignment
 		self.teamLijst = {}
 		self.ledenLijst = {}
-		self.cleantext = ""
 
 	
 	def getPersonenLijst(self):
 		return self.teamLijst
-
-	def cleanhtml(self,raw_html):
-  		cleanr = re.compile('<.*?>')
-  		cleantext = re.sub(cleanr, '', raw_html)
-  		return cleantext
-
-  	def getWebPage(self):
-		if self.downloadWebPage:
-			response = urllib2.urlopen(self.url)
-			webContent = response.read()
-			self.cleantext = self.cleanhtml(webContent)
-			if self.saveWebPage:
-				savedWebPage = open("savedWebPage","w")
-				savedWebPage.write(self.cleantext)
-				savedWebPage.close()
-		else:
-			f = open("savedWebPage","r")
-			self.cleantext = self.cleanhtml(f.read())
-			f.close()
-
 
 	def persoonInfo(self,line):
 		splitNum = line.find(',')
@@ -109,125 +82,6 @@ class Controller:
 		self.ledenLijst[naam] = team
 		return {'naam':naam,'team':team}
 	
-	def preProcessInputData(self,blok):
-		inputList = []
-		if(blok == ''):
-			return []
-
-		blok = blok.replace(' ',',')
-		new = ''
-		#dit wordt raar gedaan omdat de data die in 'blok' zit kanker vaag is
-		
-		for char in blok:
-			if char.isdigit() or char.isalpha() or char == ',' or char == ':':
-				new += char
-			if char == '\n': 
-				new += ','
-		#to remove double qoutes if there are mutliple newlines next to eachother
-			if new[-2:] == ',,':
-				new = new[:-1]
-		
-		inputString = new + ','
-		entry = ''
-		
-		if self.debug:
-			print inputString
-
-		for x in inputString:
-			if x != ',':
-				entry += x
-			else:
-				inputList.append(entry)
-				entry = ''
-		
-		if self.debug:
-			print str(inputList)
-		
-		return inputList
-		#TODO
-	def parseInputData(self,verifiedData):
-		teamInfo = {}
-
-		tegenstander = ""
-		tempTeamInfo = verifiedData[:]
-
-		for entry in parsedData: #team nummer van tegenstander wordt weggegooid
-			if entry.isalpha():
-				tegenstander += entry + ' '
-				tempTeamInfo.remove(entry)
-			else:
-				tempTeamInfo.remove(entry)
-				break
-		verifiedData = tempTeamInfo
-		teamInfo['tegenstander'] = tegenstander[:-1]
-
-		teamInfo['speeltijd'] = parsedData[0]
-		parsedData.remove(parsedData[0]) 
-
-	def verifyInputData(self,parsedData,infoHorecaLid):
-		if parsedData == []:
-			print "De team informatie voor " + infoHorecaLid['team'] + " is niet gevonden"
-			self.teamLijst[infoHorecaLid['team']]['compleet'] = False
-
-		if not parsedData[0] == infoHorecaLid['team'][:-3]:
-			print 'parsedData and horecaLid komen niet overeen'
-			print parsedData[0] + infoHorecaLid['team'][:-3]
-			#self.teamLijst[infoHorecaLid[infoHorecaLid['team']]['compleet']] = False
-			self.teamLijst[infoHorecaLid['team']]['compleet'] = False
-
-		if not parsedData[1] == infoHorecaLid['team'][-2:]:
-			print 'parsedData and horecaLid komen niet overeen'
-			print parsedData[1] + infoHorecaLid['team'][-2:]
-			#self.teamLijst[infoHorecaLid[infoHorecaLid['team']]['compleet']] = False
-			self.teamLijst[infoHorecaLid['team']]['compleet'] = False
-			return infoHorecaLid
-
-		#teamInfo['team'] = infoHorecaLid['team']
-
-		parsedData.remove(infoHorecaLid['team'][:-3])
-		parsedData.remove(infoHorecaLid['team'][-2:])
-
-		tegenstander = ""
-		tempTeamInfo = parsedData[:]
-		for entry in parsedData: #team nummer van tegenstander wordt weggegooid
-			if entry.isalpha():
-				tegenstander += entry + ' '
-				tempTeamInfo.remove(entry)
-			else:
-				tempTeamInfo.remove(entry)
-				break
-		parsedData = tempTeamInfo
-		teamInfo['tegenstander'] = tegenstander[:-1]
-
-		if not parsedData[0].find(':') == 2 or not parsedData[0][:2].isdigit() or not parsedData[0][-2:].isdigit():
-			print "er is iets mis met de ingelezen tijd"
-			if parsedData[0] == 'nnb':
-				print 'de tijd voor ' + infoHorecaLid['team'] + ' staat nog niet op de gchc site. Probeer het later nog eens of vul het zelf in.'
-			else:
-				print parsedData[0] + infoHorecaLid['team']
-			self.teamLijst[infoHorecaLid['team']]['compleet'] = False
-			parsedData.remove(parsedData[0]) 
-		else:
-			teamInfo['speeltijd'] = parsedData[0]
-			parsedData.remove(parsedData[0]) 
-
-		if parsedData[0][:1].isalpha() and parsedData[0][1:].isdigit():
-			parsedData.remove(parsedData[0])
-
-		if parsedData[0].lower() != 'thuis' and parsedData[0].lower() != 'uit':
-			print "Er klopt iets niet met de plek waar er gespeeld wordt"
-			print parsedData[0]
-			self.teamLijst[infoHorecaLid['team']]['compleet'] = False
-			parsedData.remove(parsedData[0])
-		else:
-			teamInfo['speelplek'] = parsedData[0].lower()
-			parsedData.remove(parsedData[0])
-
-		if not parsedData == []:
-			print 'de parsedData lijst is niet leeg'
-			self.teamLijst[infoHorecaLid['team']]['compleet'] = False
-			print parsedData
-			print teamInfo
 
 	#transformeer tijd naar base 100
 	def speelTijdTeam(self,speeltijdTeam):
@@ -249,41 +103,10 @@ class Controller:
 
 		return int(round(uur) + round(minuten)) #wel weer doorrekenen met ints
 
-	def findBlokSize(self,teamCharNum):
-		laatsteWoorden = ['Thuis','Uit']
-		blok = ''
-		for i,char in enumerate(self.cleantext[teamCharNum:]):
-			if laatsteWoorden[0] in blok or laatsteWoorden[1] in blok:
-				break
-			blok += char
-		return len(blok)
-
-	def getInputData(self,teamCharNum):
-		bloksize = self.findBlokSize(teamCharNum)
-		blok = self.cleantext[teamCharNum:teamCharNum+bloksize]
-		
-		if self.debug:
-			print blok
-		
-		return blok
 
 	def getInfoTeamHorecaLid(self,infoHorecaLid):
-		teamCharNum = self.cleantext.find(infoHorecaLid['team'])
-		
-		dataInBlok = self.getInputData(teamCharNum)
-
-		preProcessInputData = self.preProcessInputData(dataInBlok)
-		
-		verifiedData = self.verifyInputData(preProcessInputData,infoHorecaLid)
-		exit()
-
-		parsedData = self.parseInputData()
-
-
-		if self.teamLijst[infoHorecaLid['team']]['compleet'] == False:
-			return infoHorecaLid
-
-		return verifiedData
+		h = handelinputdata.Handelinputdata(infoHorecaLid)
+		return h.handel()
 
 	def findnth(self,haystack, needle, n):
 	    parts= haystack.split(needle, n+1)
@@ -385,10 +208,9 @@ class Controller:
 				eindTijdPrint += self.shiftTijd
 
 	def determineBeschikbaarheid(self):
-		self.getWebPage()
 		for lid in self.horecaLeden.readlines():
 			teamInfo = self.getInfoTeamHorecaLid(self.persoonInfo(lid))
-			if self.teamLijst[teamInfo['team']]['compleet'] and 'beschikbaarheid' not in self.teamLijst[teamInfo['team']]:
+			if teamInfo['status'] == 'OK' and 'beschikbaarheid' not in self.teamLijst[teamInfo['team']]:
 				reistijd = self.getReistijd(teamInfo)
 				speelTijd = self.speelTijdTeam(teamInfo['speeltijd'])
 

@@ -1,1 +1,0 @@
-/usr/bin/c++      CMakeFiles/konker.dir/src/main.cc.o CMakeFiles/konker.dir/src/person.cc.o CMakeFiles/konker.dir/src/inlezen.cc.o  -o build/konker -rdynamic -lm 

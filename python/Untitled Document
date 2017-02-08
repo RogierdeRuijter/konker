@@ -1,0 +1,4 @@
+[Spacing]
+files = src/**/*.cc
+bears = SpaceConsistencyBear
+use_spaces = nope
