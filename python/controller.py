@@ -114,77 +114,116 @@ class Controller:
 	        return -1
 	    return len(haystack)-len(parts[-1])-len(needle)
 
+	def getContentFile(self,filenaam):
+		f = open(filenaam,"r")
+		contentFile = f.read()
+		f.close()
+		return contentFile
+
+	def writeLineInFile(self,filenaam,stringToWrite):
+		f = open(filenaam, 'r+')
+		f.write(stringToWrite)
+		f.close()
+
+	def adressFromFile(self,tegenstander):
+		addressLijst = self.getContentFile('addressLijst')
+		num = addressLijst.find(tegenstander)
+		addressLine = addressLijst[num:num+addressLijst.find('\n')]
+		tegenstander = addressLine[self.findnth(addressLine,',,',0)+2:self.findnth(addressLine,',,',1)]
+		tegenstander_adress = addressLine[self.findnth(addressLine,',,',1)+2:addressLine.find('\n')]
+		
+		return {'adress':tegenstander_adress,'naam':tegenstander,'status':'ok'}
+
+	def adressFromGoogle(self,tegenstander):
+		oldtegenstander = tegenstander		
+		places = googlemaps.Client(keyplaces)
+		place = places.places(tegenstander)
+		time.sleep(5)
+
+		if place['status'] == 'ZERO_RESULTS':
+			return {'status':'error'}	
+		else:
+			tegenstander = place['results'][0]['name']
+			tegenstander_adress = place['results'][0]['formatted_address']	
+			self.writeLineInFile('addressLijst',oldtegenstander + ',,'  + tegenstander + ',,' + tegenstander_adress + '\n')
+			return {'adress':tegenstander_adress,'naam':tegenstander,'status':'ok'}
+
+
+
+	def getAdressTegenstander(self,teamInfo):
+		tegenstander = teamInfo['tegenstander'] + ',hockey'
+
+		if tegenstander in self.getContentFile('addressLijst'): #Oppassen
+			return self.adressFromFile(tegenstander)	
+		else:
+			return self.adressFromGoogle(tegenstander)
+	
+	def reistijdFromFile(self,naam):
+		reistijdClubs = self.getContentFile('reistijdClubs')
+		reistijd = ''
+
+		num = reistijdClubs.find(naam)
+		clubLine = reistijdClubs[num:]
+		clubLine = clubLine[:clubLine.find('\n')]
+		for char in clubLine:
+			if char.isdigit():
+				if len(reistijd) == 2:
+					reistijd += '.'
+				reistijd += char
+		return int(float(reistijd))
+
+	def reistijdFromGoogle(self,naam,adress):
+		gmaps = googlemaps.Client(key)
+		directions = {}
+
+		while adress != 'Netherlands':
+			try:
+				directions = gmaps.directions(self.thuisAdress,adress,mode="driving",region='nl') 
+			except Exception:
+				time.sleep(5)
+				numNieuwWoord = adress.find(' ')
+				adress = adress[numNieuwWoord+1:]
+				print adress
+			else:
+				break
+
+		if directions != []:
+			return -1
+
+		if self.debug:
+			print '\directions[0][legs][0][duration]: ' + str(directions[0]['legs'][0]['duration'])
+			print '\directions[0][legs][0][duration][text]: ' + str(directions[0]['legs'][0]['duration']['text'])
+
+		reistijd = float(directions[0]['legs'][0]['duration']['value'])
+		
+		if reistijd != 0: 
+			reistijd /= 60.0 #van sec naar min
+			reistijd = (reistijd/60.0)*100 #naar base 100
+
+		if self.debug:
+			print "\ttegenstander: " + tegenstanderInfo['naam'] + '\n' + '\treistijd: ' + str(reistijd)
+			print "einde getReistijd()"	
+
+		self.writeLineInFile('reistijdClubs',tegenstanderInfo['naam'] + " " + str(reistijd) + "\n")
+
+		return int(reistijd)
+	
+
 	def getReistijd(self,teamInfo):
 		#wanner ga je op de fiets en wanneer met he ov of met de auto
-		reistijd = ''
-		tegenstander = teamInfo['tegenstander']+',hockey'
-		f = open('addressLijst', 'r+')
-		addressLijst = f.read()
-		place = {}
-		tegenstander_adress = {}
-
+		tegenstanderInfo = self.getAdressTegenstander(teamInfo)
+		
 		if self.debug:
 			print "begin getReistijd"
-		if tegenstander in addressLijst:
-			num = addressLijst.find(tegenstander)
-			addressLine = addressLijst[num:num+addressLijst.find('\n')]
-			tegenstander = addressLine[self.findnth(addressLine,',,',0)+2:self.findnth(addressLine,',,',1)]
-			tegenstander_adress = addressLine[self.findnth(addressLine,',,',1)+2:addressLine.find('\n')]
-			place['status'] = 'INLIJST'
+
+		if tegenstanderInfo['status'] == 'error':
+			#errormessage
+			pass
+
+		if tegenstanderInfo['naam'] in self.getContentFile('reistijdClubs'):
+			return self.reistijdFromFile(tegenstanderInfo['naam'])
 		else:
-			oldtegenstander = tegenstander
-			time.sleep(5)
-			places = googlemaps.Client(keyplaces)
-			place = places.places(tegenstander)
-			if place['status'] == 'ZERO_RESULTS':
-				print 'kan tegenstander niet vinden ' + tegenstander
-				reistijd = '0'	
-			else:
-				tegenstander = place['results'][0]['name']
-				tegenstander_adress = place['results'][0]['formatted_address']
-				f.write(oldtegenstander + ',,'  + tegenstander + ',,' + tegenstander_adress + '\n')
-		f.close()	
-		f = open("reistijdClubs","r+")
-		reistijdClubs = f.read()
-		if tegenstander in reistijdClubs:
-			num = reistijdClubs.find(tegenstander)
-			clubLine = reistijdClubs[num:]
-			clubLine = clubLine[:clubLine.find('\n')]
-			for char in clubLine:
-				if char.isdigit():
-					if len(reistijd) == 2:
-						reistijd += '.'
-					reistijd += char
-		else:
-			gmaps = googlemaps.Client(key)
-			directions_result = {}
-			if place['status'] == 'OK' or place['status'] == 'INLIJST':
-				while tegenstander_adress != '':
-					try:
-						directions_result = gmaps.directions(self.thuisAdress,tegenstander_adress,mode="driving",region='nl') 
-					except Exception:
-						time.sleep(2)
-						numNieuwWoord = tegenstander_adress.find(' ')
-						tegenstander_adress = tegenstander_adress[numNieuwWoord+1:]
-						print tegenstander_adress
-					else:
-						break
-			if self.debug and directions_result != []:
-				print '\tdirections_result[0][legs][0][duration]: ' + str(directions_result[0]['legs'][0]['duration'])
-				print '\tdirections_result[0][legs][0][duration][text]: ' + str(directions_result[0]['legs'][0]['duration']['text'])
-
-			reistijd = directions_result[0]['legs'][0]['duration']['value'] if directions_result != [] else 0 
-			if reistijd != 0: 
-				reistijd /= 60.0 #van sec naar min
-				reistijd = (reistijd/60.0)*100 #naar base 100
-
-
-			f.write(tegenstander + " " + str(reistijd) + "\n")
-		f.close()
-		if self.debug:
-			print "\ttegenstander: " + tegenstander + '\n' + '\treistijd: ' + str(reistijd)
-			print "einde getReistijd()"
-		return int(float(reistijd)) if reistijd != '' else 0
+			return self.reistijdFromGoogle(tegenstanderInfo['naam'],tegenstanderInfo['adress'])
 
 	def printBeschikbaarheidsLijst(self):
 		beginTijdPrint = self.beginTijdDag
@@ -207,6 +246,23 @@ class Controller:
 				beginTijdPrint += self.shiftTijd
 				eindTijdPrint += self.shiftTijd
 
+	def printInfoSuccesfullness(self):
+		print 'voor deze leden is de beschikbaarheid bepaald: '
+		for lid in self.ledenLijst:
+			if self.teamLijst[self.ledenLijst[lid]]['compleet'] == True:
+				if self.ledenLijst[lid] not in self.teamLijst.keys():
+					print "\t" + self.ledenLijst[lid] + ' kwam helemaal niet voor in de gedownloade webpagina'
+				else:
+					print "\t" + lid  + ', ' + self.ledenLijst[lid] 
+
+		print 'voor deze leden kon geen correct beschikbaarheid bepaald worden: '
+		for lid in self.ledenLijst:
+			if self.teamLijst[self.ledenLijst[lid]]['compleet'] == False:
+				if self.ledenLijst[lid] not in self.teamLijst.keys():
+					print "\t" + self.ledenLijst[lid] + ' kwam helemaal niet voor in de gedownloade webpagina'
+				else:
+					print "\t" + lid  + ', ' + self.ledenLijst[lid] 
+		
 	def determineBeschikbaarheid(self):
 		for lid in self.horecaLeden.readlines():
 			teamInfo = self.getInfoTeamHorecaLid(self.persoonInfo(lid))
@@ -243,22 +299,8 @@ class Controller:
 
 				if self.debug:
 					print 'einde determineBeschikbaarheid'
-		
-		print 'voor deze leden is de beschikbaarheid bepaald: '
-		for lid in self.ledenLijst:
-			if self.teamLijst[self.ledenLijst[lid]]['compleet'] == True:
-				if self.ledenLijst[lid] not in self.teamLijst.keys():
-					print "\t" + self.ledenLijst[lid] + ' kwam helemaal niet voor in de gedownloade webpagina'
-				else:
-					print "\t" + lid  + ', ' + self.ledenLijst[lid] 
 
-		print 'voor deze leden kon geen correct beschikbaarheid bepaald worden: '
-		for lid in self.ledenLijst:
-			if self.teamLijst[self.ledenLijst[lid]]['compleet'] == False:
-				if self.ledenLijst[lid] not in self.teamLijst.keys():
-					print "\t" + self.ledenLijst[lid] + ' kwam helemaal niet voor in de gedownloade webpagina'
-				else:
-					print "\t" + lid  + ', ' + self.ledenLijst[lid] 
+			self.printInfoSuccesfullness()
 		
 
 	def outputRooster(self):
