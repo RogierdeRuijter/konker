@@ -1,3 +1,0 @@
-#key='AIzaSyDvacp3LS0o1LbHmcb9ggLYo4O0B4zSlkI'
-key='AIzaSyCvpcJDlal883T9ql6JwL48HR9zHInPSL0'
-keyplaces='AIzaSyA1bxquEZetkaX8zrpoimd7599Hhboh1n0'
