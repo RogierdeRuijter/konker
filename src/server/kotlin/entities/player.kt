@@ -1,0 +1,1 @@
+data class Player(val playerNr: Int, val firstName: String, val lastName: String, val teamName: String)

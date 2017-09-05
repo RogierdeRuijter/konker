@@ -1,0 +1,1 @@
+data class Club(val clubId: Int, val name: String, val travelTime: Float)
